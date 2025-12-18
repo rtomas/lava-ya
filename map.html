@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lava Ya | Fichas</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .stats {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 4px;
+            text-align: center;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        #map {
+            height: 700px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .legend {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .legend h3 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            padding: 4px;
+            background: white;
+            border-radius: 3px;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 3px rgba(0,0,0,0.3);
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+
+        .popup-content {
+            padding: 5px;
+        }
+
+        .popup-content h4 {
+            margin: 0 0 8px 0;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .popup-content p {
+            margin: 4px 0;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .popup-content .address {
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Venta Lava Ya Monedas</h1>
+
+        <div class="stats" style="display: none;">
+            <div class="stat-item">
+                <div class="stat-number" id="total-locations">0</div>
+                <div class="stat-label">Ubicaciones</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="total-neighborhoods">0</div>
+                <div class="stat-label">Barrios</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">100%</div>
+                <div class="stat-label">OpenStreetMap</div>
+            </div>
+        </div>
+
+        <div class="controls" style="display: none;">
+            <button class="btn" onclick="fitAllMarkers()">Ver Todas</button>
+            <button class="btn btn-secondary" onclick="toggleClusters()">Agrupar/Desagrupar</button>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="legend">
+            <h3>Barrios</h3>
+            <div class="legend-grid" id="legend"></div>
+        </div>
+    </div>
+
+    <script>
+        // Geocoded locations data embedded directly
+        const locations = [
+  {
+    "address": "Gascon 897",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.6005105,
+    "lon": -58.4236693,
+    "display_name": "897, Gascón, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, C1185AAN, Argentina"
+  },
+  {
+    "address": "Guardia Vieja 3843",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.6008279,
+    "lon": -58.4184005,
+    "display_name": "3843, Guardia Vieja, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, 1175, Argentina"
+  },
+  {
+    "address": "Bulnes 893",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.6011156,
+    "lon": -58.4177513,
+    "display_name": "893, Bulnes, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, C1194AAD, Argentina"
+  },
+  {
+    "address": "Mario Bravo 697",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.60159,
+    "lon": -58.4163005,
+    "display_name": "697, Mario Bravo, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, C1174ABK, Argentina"
+  },
+  {
+    "address": "Av. Rivadavia 4123",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.6126395,
+    "lon": -58.4239989,
+    "display_name": "4123, Avenida Rivadavia, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, C1205AAB, Argentina"
+  },
+  {
+    "address": "Diaz Velez 5320",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.6086125,
+    "lon": -58.4238797,
+    "display_name": "Avenida Díaz Vélez, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, 1200, Argentina"
+  },
+  {
+    "address": "Gascon 597",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.6046599,
+    "lon": -58.4243039,
+    "display_name": "597, Gascón, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, C1181ACK, Argentina"
+  },
+  {
+    "address": "Garcia Lorca 78",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6209221,
+    "lon": -58.4448789,
+    "display_name": "78, Federico García Lorca, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1424CEL, Argentina"
+  },
+  {
+    "address": "Sarmiento 4187",
+    "neighborhood": "ALMAGRO",
+    "lat": -34.604463,
+    "lon": -58.4240696,
+    "display_name": "4187, Sarmiento, Calle de las Flores, Almagro, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, 1197, Argentina"
+  },
+  {
+    "address": "Levalle 275",
+    "neighborhood": "AVELLANEDA",
+    "lat": -34.6577381,
+    "lon": -58.3694066,
+    "display_name": "275, General Levalle, Avellaneda, Partido de Avellaneda, Buenos Aires, 1870, Argentina"
+  },
+  {
+    "address": "Laprida 91",
+    "neighborhood": "AVELLANEDA",
+    "lat": -34.6633625,
+    "lon": -58.3615285,
+    "display_name": "91, Laprida, Crucecita, Avellaneda, Partido de Avellaneda, Buenos Aires, 1870, Argentina"
+  },
+  {
+    "address": "Av. Jujuy 283",
+    "neighborhood": "BALVANERA",
+    "lat": -34.6132252,
+    "lon": -58.4054981,
+    "display_name": "283, Avenida Jujuy, Once, Balvanera, Buenos Aires, Comuna 3, Ciudad Autónoma de Buenos Aires, 1083, Argentina"
+  },
+  {
+    "address": "Valentin Vergara 1472",
+    "neighborhood": "BANFIELD",
+    "lat": -34.743544,
+    "lon": -58.3947722,
+    "display_name": "1472, Valentín Vergara, Banfield, Partido de Lomas de Zamora, Buenos Aires, 1828, Argentina"
+  },
+  {
+    "address": "Montes de Oca 1654",
+    "neighborhood": "BARRACAS",
+    "lat": -34.646759,
+    "lon": -58.3728842,
+    "display_name": "1654, Avenida Manuel Augusto Montes de Oca, Barracas, Buenos Aires, Distrito del Diseño, Comuna 4, Ciudad Autónoma de Buenos Aires, C1269ABF, Argentina"
+  },
+  {
+    "address": "Montes de Oca 803",
+    "neighborhood": "BARRACAS",
+    "lat": -34.6379607,
+    "lon": -58.374849,
+    "display_name": "803, Avenida Manuel Augusto Montes de Oca, Barracas, Buenos Aires, Distrito del Diseño, Comuna 4, Ciudad Autónoma de Buenos Aires, 1295, Argentina"
+  },
+  {
+    "address": "Montes de Oca 216",
+    "neighborhood": "BARRACAS",
+    "lat": -34.6311014,
+    "lon": -58.3764432,
+    "display_name": "216, Avenida Manuel Augusto Montes de Oca, Barracas, Buenos Aires, Comuna 4, Ciudad Autónoma de Buenos Aires, C1272AAA, Argentina"
+  },
+  {
+    "address": "Av. Suarez 2002",
+    "neighborhood": "BARRACAS",
+    "lat": -34.6413724,
+    "lon": -58.3784566,
+    "display_name": "2002, Avenida Suárez, Barracas, Buenos Aires, Distrito del Diseño, Comuna 4, Ciudad Autónoma de Buenos Aires, 1274, Argentina"
+  },
+  {
+    "address": "Neyer 8",
+    "neighborhood": "BECCAR",
+    "lat": -34.462984,
+    "lon": -58.5253129,
+    "display_name": "8, Intendente Neyer, Quinta del Niño, Beccar, Partido de San Isidro, Buenos Aires, B1643, Argentina"
+  },
+  {
+    "address": "Dr. Repetto 901",
+    "neighborhood": "MARTINEZ",
+    "lat": -34.4850897,
+    "lon": -58.5019302,
+    "display_name": "Domingo S. Repetto, Martínez, Partido de San Isidro, Buenos Aires, 1640, Argentina"
+  },
+  {
+    "address": "Av. Sucre 2901",
+    "neighborhood": "BECCAR",
+    "lat": -34.4709593,
+    "lon": -58.5552228,
+    "display_name": "2901, Avenida Sucre, Beccar, Partido de San Isidro, Buenos Aires, B1644HKG, Argentina"
+  },
+  {
+    "address": "Amenabar 2470",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5597529,
+    "lon": -58.461552,
+    "display_name": "2470, Amenábar, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1428AAT, Argentina"
+  },
+  {
+    "address": "Monroe 3598",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5654801,
+    "lon": -58.4711718,
+    "display_name": "3598, Avenida Monroe, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1430FED, Argentina"
+  },
+  {
+    "address": "Monroe 2891",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5608408,
+    "lon": -58.4643976,
+    "display_name": "2891, Monroe, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1428AAU, Argentina"
+  },
+  {
+    "address": "Vuelta de Obligado 2294",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5597332,
+    "lon": -58.4572626,
+    "display_name": "2294, Vuelta de Obligado, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426ABB, Argentina"
+  },
+  {
+    "address": "Cramer 1800",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5677201,
+    "lon": -58.4589173,
+    "display_name": "1800, Avenida Crámer, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1428CPD, Argentina"
+  },
+  {
+    "address": "Virrey del Pino 2390",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5660234,
+    "lon": -58.4519056,
+    "display_name": "2390, Virrey Del Pino, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426ABP, Argentina"
+  },
+  {
+    "address": "Jose Hernandez 2426",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5658729,
+    "lon": -58.4537461,
+    "display_name": "2426, José Hernández, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426ABR, Argentina"
+  },
+  {
+    "address": "Av. Libertador 6440",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5527038,
+    "lon": -58.4513583,
+    "display_name": "6440, Avenida Del Libertador, Barrio River, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426ABC, Argentina"
+  },
+  {
+    "address": "Monroe 1598",
+    "neighborhood": "BELGRANO",
+    "lat": -34.553649,
+    "lon": -58.4519404,
+    "display_name": "1598, Monroe, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426ABC, Argentina"
+  },
+  {
+    "address": "Montañeses 2782",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5514582,
+    "lon": -58.4541275,
+    "display_name": "2782, Montañeses, Barrio River, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1429BMC, Argentina"
+  },
+  {
+    "address": "Virrey Arredondo 2620",
+    "neighborhood": "BELGRANO",
+    "lat": -34.5661543,
+    "lon": -58.4501144,
+    "display_name": "Virrey Arredondo, Belgrano, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426BFB, Argentina"
+  },
+  {
+    "address": "Jose Marmol 937",
+    "neighborhood": "BOEDO",
+    "lat": -34.6255134,
+    "lon": -58.4245922,
+    "display_name": "937, José Mármol, Boedo, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, C1126AAG, Argentina"
+  },
+  {
+    "address": "Av. La Plata 1421",
+    "neighborhood": "BOEDO",
+    "lat": -34.6317537,
+    "lon": -58.4258428,
+    "display_name": "1421, Avenida La Plata, Parque Chacabuco, Buenos Aires, Comuna 7, Ciudad Autónoma de Buenos Aires, 1250, Argentina"
+  },
+  {
+    "address": "Campichuelo 301",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6132575,
+    "lon": -58.4343749,
+    "display_name": "301, Campichuelo, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1405BOG, Argentina"
+  },
+  {
+    "address": "Gaona 2814",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6134574,
+    "lon": -58.4583889,
+    "display_name": "Avenida Gaona, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1416DRJ, Argentina"
+  },
+  {
+    "address": "Neuquen 1812",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6158572,
+    "lon": -58.4578947,
+    "display_name": "Neuquén, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1406BOS, Argentina"
+  },
+  {
+    "address": "Nicolas repetto 1113",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6086161,
+    "lon": -58.4489765,
+    "display_name": "1113, Doctor Nicolás Repetto, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1416DRC, Argentina"
+  },
+  {
+    "address": "Paysandu 1507",
+    "neighborhood": "CABALLITO",
+    "lat": -34.606822,
+    "lon": -58.4566565,
+    "display_name": "1507, Paysandú, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1416CEK, Argentina"
+  },
+  {
+    "address": "Av. Directorio 105",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6270998,
+    "lon": -58.4283455,
+    "display_name": "105, Avenida Directorio, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1424BDV, Argentina"
+  },
+  {
+    "address": "Av. Directorio 216",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6275552,
+    "lon": -58.4299137,
+    "display_name": "216, Avenida Directorio, Parque Chacabuco, Buenos Aires, Comuna 7, Ciudad Autónoma de Buenos Aires, C1424BDV, Argentina"
+  },
+  {
+    "address": "Del Barco Centenera 208",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6220763,
+    "lon": -58.4408587,
+    "display_name": "208, Del Barco Centenera, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, 1475, Argentina"
+  },
+  {
+    "address": "Emilio Mitre 408",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6269792,
+    "lon": -58.4431521,
+    "display_name": "408, Emilio Mitre, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1406GZB, Argentina"
+  },
+  {
+    "address": "Formosa 487",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6211639,
+    "lon": -58.4349034,
+    "display_name": "487, Formosa, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1424AAQ, Argentina"
+  },
+  {
+    "address": "Bogota 984",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6183314,
+    "lon": -58.4450935,
+    "display_name": "984, Bogotá, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, C1405CNV, Argentina"
+  },
+  {
+    "address": "San Martin 313",
+    "neighborhood": "CAMPANA",
+    "lat": -34.1624961,
+    "lon": -58.9603501,
+    "display_name": "313, San Martín, Barrio Inglés, Campana, Partido de Campana, Buenos Aires, 2804, Argentina"
+  },
+  {
+    "address": "3 de Febrero 2608",
+    "neighborhood": "CASEROS",
+    "lat": -34.606,
+    "lon": -58.5638064,
+    "display_name": "2608, 647 - 3 de Febrero, Caseros, Partido de Tres de Febrero, Buenos Aires, B1678ABJ, Argentina"
+  },
+  {
+    "address": "San Pedro 913",
+    "neighborhood": "CASTELAR",
+    "lat": -34.6502585,
+    "lon": -58.6456497,
+    "display_name": "913, San Pedro, Castelar, Partido de Morón, Buenos Aires, B1712JOB, Argentina"
+  },
+  {
+    "address": "Guevara 502",
+    "neighborhood": "CHACARITA",
+    "lat": -34.5863482,
+    "lon": -58.4519695,
+    "display_name": "502, Guevara, Chacarita, Buenos Aires, Distrito Audiovisual, Comuna 15, Ciudad Autónoma de Buenos Aires, C1427BRJ, Argentina"
+  },
+  {
+    "address": "Av. Corrientes 6305",
+    "neighborhood": "CHACARITA",
+    "lat": -34.5903919,
+    "lon": -58.4487855,
+    "display_name": "6305, Avenida Corrientes, Chacarita, Buenos Aires, Distrito Audiovisual, Comuna 15, Ciudad Autónoma de Buenos Aires, C1427BPB, Argentina"
+  },
+  {
+    "address": "Balbin 2406",
+    "neighborhood": "COGHLAN",
+    "lat": -34.5574016,
+    "lon": -58.4777669,
+    "display_name": "Avenida Doctor Ricardo Balbín, Coghlan, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1430AIF, Argentina"
+  },
+  {
+    "address": "Freire 2302",
+    "neighborhood": "COGHLAN",
+    "lat": -34.5588965,
+    "lon": -58.4705161,
+    "display_name": "Capitán General Ramón Freire, Coghlan, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1429CMZ, Argentina"
+  },
+  {
+    "address": "Freire 1448",
+    "neighborhood": "COGHLAN",
+    "lat": -34.5588965,
+    "lon": -58.4705161,
+    "display_name": "Capitán General Ramón Freire, Coghlan, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1429CMZ, Argentina"
+  },
+  {
+    "address": "Dorrego 1825",
+    "neighborhood": "COLEGIALES",
+    "lat": -34.5808437,
+    "lon": -58.4423353,
+    "display_name": "1825, Dorrego, Palermo, Buenos Aires, Distrito Audiovisual, Comuna 14, Ciudad Autónoma de Buenos Aires, C1414BBF, Argentina"
+  },
+  {
+    "address": "J. Newbery 3327",
+    "neighborhood": "COLEGIALES",
+    "lat": -34.5740789,
+    "lon": -58.4427089,
+    "display_name": "Jorge Newbery, Colegiales, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426AJF, Argentina"
+  },
+  {
+    "address": "Santos Dumont 3487",
+    "neighborhood": "COLEGIALES",
+    "lat": -34.580253,
+    "lon": -58.4461819,
+    "display_name": "Santos Dumont, Colegiales, Buenos Aires, Distrito Audiovisual, Comuna 13, Ciudad Autónoma de Buenos Aires, C1427BZB, Argentina"
+  },
+  {
+    "address": "Lacroze 3577",
+    "neighborhood": "COLEGIALES",
+    "lat": -34.5743244,
+    "lon": -58.4473596,
+    "display_name": "Avenida Federico Lacroze, Colegiales, Buenos Aires, Distrito Audiovisual, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426CQO, Argentina"
+  },
+  {
+    "address": "Lacroze 3863",
+    "neighborhood": "COLEGIALES",
+    "lat": -34.5743244,
+    "lon": -58.4473596,
+    "display_name": "Avenida Federico Lacroze, Colegiales, Buenos Aires, Distrito Audiovisual, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426CQO, Argentina"
+  },
+  {
+    "address": "Virrey Arredondo 3553",
+    "neighborhood": "COLEGIALES",
+    "lat": -34.5776849,
+    "lon": -58.4593116,
+    "display_name": "3553, Virrey Arredondo, Colegiales, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426EJP, Argentina"
+  },
+  {
+    "address": "Av. Elcano 3604",
+    "neighborhood": "COLEGIALES",
+    "lat": -34.5730766,
+    "lon": -58.4594268,
+    "display_name": "Avenida Elcano, Colegiales, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1426EJP, Argentina"
+  },
+  {
+    "address": "Granaderos 582",
+    "neighborhood": "FLORES",
+    "lat": -34.6212207,
+    "lon": -58.4621963,
+    "display_name": "582, Granaderos, Flores, Buenos Aires, Comuna 7, Ciudad Autónoma de Buenos Aires, C1406FYG, Argentina"
+  },
+  {
+    "address": "Yerbal 2765",
+    "neighborhood": "FLORES",
+    "lat": -34.6288836,
+    "lon": -58.4683866,
+    "display_name": "2765, Yerbal, Flores, Buenos Aires, Comuna 7, Ciudad Autónoma de Buenos Aires, C1406GMC, Argentina"
+  },
+  {
+    "address": "Avellaneda 2008",
+    "neighborhood": "FLORES",
+    "lat": -34.6226345,
+    "lon": -58.4597496,
+    "display_name": "2008, Avenida Avellaneda, Flores, Buenos Aires, Comuna 7, Ciudad Autónoma de Buenos Aires, C1406FYG, Argentina"
+  },
+  {
+    "address": "Avellaneda 557",
+    "neighborhood": "FLORIDA",
+    "lat": -34.5336849,
+    "lon": -58.4805038,
+    "display_name": "557, Nicolás Avellaneda, Florida, Vicente López, Partido de Vicente López, Buenos Aires, B1602, Argentina"
+  },
+  {
+    "address": "Maipu 578",
+    "neighborhood": "FLORIDA",
+    "lat": -34.5328551,
+    "lon": -58.4791108,
+    "display_name": "578, Avenida Maipú, Florida, Vicente López, Partido de Vicente López, Buenos Aires, B1602, Argentina"
+  },
+  {
+    "address": "San Martin 2079",
+    "neighborhood": "FLORIDA",
+    "lat": -34.5275082,
+    "lon": -58.4908272,
+    "display_name": "2079, General José de San Martín, Florida, Vicente López, Partido de Vicente López, Buenos Aires, 1602, Argentina"
+  },
+  {
+    "address": "Las Heras 1734",
+    "neighborhood": "FLORIDA",
+    "lat": -34.5327592,
+    "lon": -58.4817745,
+    "display_name": "1734, General Juan Gregorio de Las Heras, Florida, Vicente López, Partido de Vicente López, Buenos Aires, B1602, Argentina"
+  },
+  {
+    "address": "Av. Rivadavia 15920",
+    "neighborhood": "HAEDO",
+    "lat": -34.6445748,
+    "lon": -58.5895458,
+    "display_name": "15920, Avenida Rivadavia, Güemes, Haedo, Partido de Morón, Buenos Aires, 1706, Argentina"
+  },
+  {
+    "address": "Federico Lacroze 4978",
+    "neighborhood": "JOSE C. PAZ",
+    "lat": -34.5082565,
+    "lon": -58.7955047,
+    "display_name": "Federico Lacroze, Juan Vucetich, José C. Paz, Partido de José C. Paz, Buenos Aires, 1743, Argentina"
+  },
+  {
+    "address": "Alvear 1051",
+    "neighborhood": "ITUZAINGO",
+    "lat": -34.6561048,
+    "lon": -58.671486,
+    "display_name": "1051, General Alvear, Villa Zona Norte, Ituzaingó, Partido de Ituzaingó, Buenos Aires, B1714LVH, Argentina"
+  },
+  {
+    "address": "Fragio 175",
+    "neighborhood": "ITUZAINGO",
+    "lat": -34.6587708,
+    "lon": -58.6693305,
+    "display_name": "175, Manuel Rodríguez Fragio, Villa Zona Norte, Ituzaingó, Partido de Ituzaingó, Buenos Aires, B1714LVH, Argentina"
+  },
+  {
+    "address": "Alte. Brown 201",
+    "neighborhood": "LA BOCA",
+    "lat": -34.6329974,
+    "lon": -58.3606414,
+    "display_name": "Aristóbulo Del Valle y Alte. Brown, Aristóbulo Del Valle, La Boca, Buenos Aires, Distrito de Las Artes, Comuna 4, Ciudad Autónoma de Buenos Aires, 1160, Argentina"
+  },
+  {
+    "address": "Olavarria 778",
+    "neighborhood": "LA BOCA",
+    "lat": -34.6382938,
+    "lon": -58.3633914,
+    "display_name": "778, Olavarría, La Boca, Buenos Aires, Distrito de Las Artes, Comuna 4, Ciudad Autónoma de Buenos Aires, C1160ABM, Argentina"
+  },
+  {
+    "address": "Diaz Velez 692",
+    "neighborhood": "LA LUCILA",
+    "lat": -34.4970935,
+    "lon": -58.489589,
+    "display_name": "692, Manuel Díaz Vélez, La Lucila, Vicente López, Partido de Vicente López, Buenos Aires, B1637, Argentina"
+  },
+  {
+    "address": "9 de Julio 1514",
+    "neighborhood": "LANUS",
+    "lat": -34.7105149,
+    "lon": -58.3864502,
+    "display_name": "1514, Avenida 9 de Julio, Villa General Paz, Lanús Este, Partido de Lanús, Buenos Aires, B1824, Argentina"
+  },
+  {
+    "address": "Margarita Weild 1314",
+    "neighborhood": "LANUS",
+    "lat": -34.71011,
+    "lon": -58.3889378,
+    "display_name": "1314, Margarita Weild, Villa General Paz, Lanús Este, Partido de Lanús, Buenos Aires, B1824, Argentina"
+  },
+  {
+    "address": "Alsina 1993",
+    "neighborhood": "LOMAS DE ZAMORA",
+    "lat": -34.7598323,
+    "lon": -58.39627,
+    "display_name": "1993, Avenida Alsina, Lomitas, Lomas de Zamora, Partido de Lomas de Zamora, Buenos Aires, 1832, Argentina"
+  },
+  {
+    "address": "Laprida 462",
+    "neighborhood": "LOMAS DE ZAMORA",
+    "lat": -34.7603708,
+    "lon": -58.403479,
+    "display_name": "462, Francisco Narciso de Laprida, Lomitas, Lomas de Zamora, Partido de Lomas de Zamora, Buenos Aires, 1870, Argentina"
+  },
+  {
+    "address": "Campo de Mayo 7665",
+    "neighborhood": "MARTIN CORONADO",
+    "lat": -34.5786912,
+    "lon": -58.5921146,
+    "display_name": "7665, 818 - Campo de Mayo, Villa Bosch, Partido de Tres de Febrero, Buenos Aires, B1683CRB, Argentina"
+  },
+  {
+    "address": "Parana 3395",
+    "neighborhood": "MARTINEZ",
+    "lat": -34.5072463,
+    "lon": -58.5186904,
+    "display_name": "3395, Paraná, Villa Gándara, Olivos, Martínez, Partido de San Isidro, Buenos Aires, B1605BNA, Argentina"
+  },
+  {
+    "address": "Entre Rios 701",
+    "neighborhood": "MONSERRAT",
+    "lat": -34.616948,
+    "lon": -58.3918232,
+    "display_name": "701, Avenida Entre Ríos, Balvanera, Buenos Aires, Comuna 3, Ciudad Autónoma de Buenos Aires, 1080, Argentina"
+  },
+  {
+    "address": "Chile 1789",
+    "neighborhood": "MONSERRAT",
+    "lat": -34.6167816,
+    "lon": -58.3914127,
+    "display_name": "1789, Chile, Monserrat, Buenos Aires, Comuna 1, Ciudad Autónoma de Buenos Aires, C1100ABE, Argentina"
+  },
+  {
+    "address": "Av. Belgrano 1902",
+    "neighborhood": "MONSERRAT",
+    "lat": -34.6132562,
+    "lon": -58.380383,
+    "display_name": "Av. Belgrano, Bernardo de Irigoyen, Monserrat, Buenos Aires, Comuna 1, Ciudad Autónoma de Buenos Aires, P1091, Argentina"
+  },
+  {
+    "address": "Santiago del Estero 840",
+    "neighborhood": "MONSERRAT",
+    "lat": -34.6181343,
+    "lon": -58.3842272,
+    "display_name": "840, Santiago del Estero, Constitución, Buenos Aires, Comuna 1, Ciudad Autónoma de Buenos Aires, C1100AAM, Argentina"
+  },
+  {
+    "address": "Mexico 699",
+    "neighborhood": "MONSERRAT",
+    "lat": -34.6149366,
+    "lon": -58.3759655,
+    "display_name": "699, México, Monserrat, Buenos Aires, Comuna 1, Ciudad Autónoma de Buenos Aires, C1070AAP, Argentina"
+  },
+  {
+    "address": "Moreno 530",
+    "neighborhood": "MORON",
+    "lat": -34.6584145,
+    "lon": -58.6168469,
+    "display_name": "530, Mariano Moreno, Viejo Urbano, Morón, Partido de Morón, Buenos Aires, B1708DYO, Argentina"
+  },
+  {
+    "address": "9 de Julio 596",
+    "neighborhood": "MORON",
+    "lat": -34.6546481,
+    "lon": -58.6184842,
+    "display_name": "596, 9 de Julio, Morón, Partido de Morón, Buenos Aires, 1708, Argentina"
+  },
+  {
+    "address": "Belgrano 497",
+    "neighborhood": "MORON",
+    "lat": -34.6537406,
+    "lon": -58.6213491,
+    "display_name": "497, General Belgrano, Viejo Urbano, Morón, Partido de Morón, Buenos Aires, 1708, Argentina"
+  },
+  {
+    "address": "Mendoza 395",
+    "neighborhood": "MORON",
+    "lat": -34.6446432,
+    "lon": -58.6224716,
+    "display_name": "395, Mendoza, Morón, Partido de Morón, Buenos Aires, 1708, Argentina"
+  },
+  {
+    "address": "Nuñez 2507",
+    "neighborhood": "NUÑEZ",
+    "lat": -34.550685,
+    "lon": -58.4686398,
+    "display_name": "2507, Núñez, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1429AAU, Argentina"
+  },
+  {
+    "address": "Moldes 3492",
+    "neighborhood": "NUÑEZ",
+    "lat": -34.5518554,
+    "lon": -58.4701014,
+    "display_name": "3492, Moldes, Núñez, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1429AAU, Argentina"
+  },
+  {
+    "address": "Larralde 1628",
+    "neighborhood": "NUÑEZ",
+    "lat": -34.5453133,
+    "lon": -58.4607306,
+    "display_name": "1628, Crisólogo Larralde, Núñez, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1429BNC, Argentina"
+  },
+  {
+    "address": "Guayra 1622",
+    "neighborhood": "NUÑEZ",
+    "lat": -34.5487134,
+    "lon": -58.4569289,
+    "display_name": "1622, Guayra, Núñez, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1429BMC, Argentina"
+  },
+  {
+    "address": "Montañeses 3097",
+    "neighborhood": "NUÑEZ",
+    "lat": -34.5485849,
+    "lon": -58.4565838,
+    "display_name": "3097, Montañeses, Núñez, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1429BMC, Argentina"
+  },
+  {
+    "address": "Ramallo 2375",
+    "neighborhood": "NUÑEZ",
+    "lat": -34.5427656,
+    "lon": -58.4723179,
+    "display_name": "2375, Ramallo, Núñez, Buenos Aires, Comuna 13, Ciudad Autónoma de Buenos Aires, C1429ABC, Argentina"
+  },
+  {
+    "address": "Roma 404",
+    "neighborhood": "OLIVOS",
+    "lat": -34.5015794,
+    "lon": -58.4825172,
+    "display_name": "404, Roma, Olivos, Vicente López, Partido de Vicente López, Buenos Aires, 1637, Argentina"
+  },
+  {
+    "address": "Av. Maipu 3796",
+    "neighborhood": "OLIVOS",
+    "lat": -34.5012811,
+    "lon": -58.4960662,
+    "display_name": "3796, Avenida Maipú, Olivos, Vicente López, Partido de Vicente López, Buenos Aires, B1636EMA, Argentina"
+  },
+  {
+    "address": "Av. Maipu 3498",
+    "neighborhood": "OLIVOS",
+    "lat": -34.5038729,
+    "lon": -58.4947557,
+    "display_name": "3498, Avenida Maipú, Olivos, Vicente López, Partido de Vicente López, Buenos Aires, B1636EMA, Argentina"
+  },
+  {
+    "address": "Corrientes 623",
+    "neighborhood": "OLIVOS",
+    "lat": -34.5089581,
+    "lon": -58.4808853,
+    "display_name": "623, Corrientes, Olivos, Vicente López, Partido de Vicente López, Buenos Aires, 1637, Argentina"
+  },
+  {
+    "address": "Av. Libertador 2494",
+    "neighborhood": "OLIVOS",
+    "lat": -34.5073877,
+    "lon": -58.4799787,
+    "display_name": "2494, Avenida del Libertador, Olivos, Vicente López, Partido de Vicente López, Buenos Aires, 1637, Argentina"
+  },
+  {
+    "address": "Guemes 3202",
+    "neighborhood": "PALERMO",
+    "lat": -34.5863793,
+    "lon": -58.4169697,
+    "display_name": "Güemes, Alto Palermo, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425DGJ, Argentina"
+  },
+  {
+    "address": "Bonpland 1256",
+    "neighborhood": "PALERMO",
+    "lat": -34.5843626,
+    "lon": -58.4384947,
+    "display_name": "Bonpland, Palermo Hollywood, Palermo, Buenos Aires, Distrito Audiovisual, Comuna 14, Ciudad Autónoma de Buenos Aires, C1414CHW, Argentina"
+  },
+  {
+    "address": "Bonpland 2291",
+    "neighborhood": "PALERMO",
+    "lat": -34.5786613,
+    "lon": -58.4319452,
+    "display_name": "Los Amachones, 2291, Bonpland, Palermo Hollywood, Palermo, Buenos Aires, Distrito Audiovisual, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425FWC, Argentina"
+  },
+  {
+    "address": "Guatemala 5620",
+    "neighborhood": "PALERMO",
+    "lat": -34.5801863,
+    "lon": -58.4322609,
+    "display_name": "5620, Guatemala, Palermo Hollywood, Palermo, Buenos Aires, Distrito Audiovisual, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425FVA, Argentina"
+  },
+  {
+    "address": "Maure 2574",
+    "neighborhood": "PALERMO",
+    "lat": -34.5679095,
+    "lon": -58.4369866,
+    "display_name": "Maure, Las Cañitas, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1426BOC, Argentina"
+  },
+  {
+    "address": "Nicaragua 5816",
+    "neighborhood": "PALERMO",
+    "lat": -34.579927,
+    "lon": -58.4358129,
+    "display_name": "5816, Nicaragua, Palermo Hollywood, Palermo, Buenos Aires, Distrito Audiovisual, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425BIO, Argentina"
+  },
+  {
+    "address": "Cabildo 245",
+    "neighborhood": "PALERMO",
+    "lat": -34.5729136,
+    "lon": -58.4389123,
+    "display_name": "245, Avenida Cabildo, Las Cañitas, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1426AAC, Argentina"
+  },
+  {
+    "address": "Cerviño 3715",
+    "neighborhood": "PALERMO",
+    "lat": -34.5792954,
+    "lon": -58.411475,
+    "display_name": "3715, Cerviño, Palermo Botánico, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425EYL, Argentina"
+  },
+  {
+    "address": "Soler 4410",
+    "neighborhood": "PALERMO",
+    "lat": -34.5889874,
+    "lon": -58.4224484,
+    "display_name": "4410, Soler, Palermo Soho, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425BUH, Argentina"
+  },
+  {
+    "address": "Sanchez de Bustamante 1189",
+    "neighborhood": "PALERMO",
+    "lat": -34.5828329,
+    "lon": -58.4018368,
+    "display_name": "Sánchez de Bustamante, Barrio Parque, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425AAS, Argentina"
+  },
+  {
+    "address": "Sarmiento 3583",
+    "neighborhood": "PALERMO",
+    "lat": -34.5744681,
+    "lon": -58.4145028,
+    "display_name": "Avenida Presidente Sarmiento, Palermo Botánico, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425GMN, Argentina"
+  },
+  {
+    "address": "Bulnes 1807",
+    "neighborhood": "PALERMO",
+    "lat": -34.588251,
+    "lon": -58.4112129,
+    "display_name": "Bulnes, Avenida Santa Fe, Alto Palermo, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425BGU, Argentina"
+  },
+  {
+    "address": "Juncal 3047",
+    "neighborhood": "PALERMO",
+    "lat": -34.5858594,
+    "lon": -58.408976,
+    "display_name": "Juncal, Alto Palermo, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425DKK, Argentina"
+  },
+  {
+    "address": "Juncal 3404",
+    "neighborhood": "PALERMO",
+    "lat": -34.5846301,
+    "lon": -58.411903,
+    "display_name": "3404, Juncal, Alto Palermo, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425DGQ, Argentina"
+  },
+  {
+    "address": "Las Heras 3806",
+    "neighborhood": "PALERMO",
+    "lat": -34.5819739,
+    "lon": -58.4130637,
+    "display_name": "3806, Avenida General Las Heras, Palermo Botánico, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425ATD, Argentina"
+  },
+  {
+    "address": "Godoy Cruz 2825",
+    "neighborhood": "PALERMO",
+    "lat": -34.577472,
+    "lon": -58.4240176,
+    "display_name": "2825, Godoy Cruz, Palermo Pacífico, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425BHH, Argentina"
+  },
+  {
+    "address": "Luis Maria Campos 242",
+    "neighborhood": "PALERMO",
+    "lat": -34.5740287,
+    "lon": -58.4322921,
+    "display_name": "Brusati, 242, Avenida Luis María Campos, Las Cañitas, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, 1426, Argentina"
+  },
+  {
+    "address": "Maure 1728",
+    "neighborhood": "PALERMO",
+    "lat": -34.5670046,
+    "lon": -58.4360958,
+    "display_name": "1728, Maure, Las Cañitas, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1426AAH, Argentina"
+  },
+  {
+    "address": "Salguero 2881",
+    "neighborhood": "PALERMO",
+    "lat": -34.5791278,
+    "lon": -58.4071794,
+    "display_name": "2881, Jerónimo Salguero, Palermo Norte, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425DEL, Argentina"
+  },
+  {
+    "address": "Salguero 2972",
+    "neighborhood": "PALERMO",
+    "lat": -34.5780216,
+    "lon": -58.4063365,
+    "display_name": "2972, Jerónimo Salguero, Palermo Norte, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425DDA, Argentina"
+  },
+  {
+    "address": "Arevalo 1565",
+    "neighborhood": "PALERMO",
+    "lat": -34.5821419,
+    "lon": -58.4416574,
+    "display_name": "1565, Arévalo, Palermo Hollywood, Palermo, Buenos Aires, Distrito Audiovisual, Comuna 14, Ciudad Autónoma de Buenos Aires, 1414, Argentina"
+  },
+  {
+    "address": "Tucuman 802",
+    "neighborhood": "PILAR",
+    "lat": -34.4558199,
+    "lon": -58.916411,
+    "display_name": "802, Tucumán, Villa Morra, Pilar, Partido del Pilar, Buenos Aires, 1629, Argentina"
+  },
+  {
+    "address": "H. Yrigoyen 483",
+    "neighborhood": "PILAR",
+    "lat": -34.4580512,
+    "lon": -58.909683,
+    "display_name": "Hipólito Yrigoyen, Villa Morra, Pilar, Partido del Pilar, Buenos Aires, 1633, Argentina"
+  },
+  {
+    "address": "Avelino Diaz 1304",
+    "neighborhood": "PQUE. CHACABUCO",
+    "lat": -34.6371723,
+    "lon": -58.4383799,
+    "display_name": "1304, Avelino Díaz, Parque Chacabuco, Buenos Aires, Comuna 7, Ciudad Autónoma de Buenos Aires, 1047, Argentina"
+  },
+  {
+    "address": "Saavedra 530",
+    "neighborhood": "RAMOS MEJIA",
+    "lat": -34.6486339,
+    "lon": -58.5676241,
+    "display_name": "530, Saavedra, Ramos Mejía Sur, Ramos Mejía, Partido de La Matanza, Buenos Aires, B1704FLD, Argentina"
+  },
+  {
+    "address": "Moreno 13",
+    "neighborhood": "RAMOS MEJIA",
+    "lat": -34.6407174,
+    "lon": -58.5631305,
+    "display_name": "13, Mariano Moreno, Ramos Mejía Norte, Ramos Mejía, Partido de La Matanza, Buenos Aires, B1704ETD, Argentina"
+  },
+  {
+    "address": "Guido 1756",
+    "neighborhood": "RECOLETA",
+    "lat": -34.5904726,
+    "lon": -58.3895436,
+    "display_name": "Like, 1756, Guido, La Isla, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, C1014ACQ, Argentina"
+  },
+  {
+    "address": "Aguero 1284",
+    "neighborhood": "RECOLETA",
+    "lat": -34.5917097,
+    "lon": -58.4070715,
+    "display_name": "Agüero, Avenida Santa Fe, Barrio Norte, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, C1425BGQ, Argentina"
+  },
+  {
+    "address": "Av. Cordoba 2087",
+    "neighborhood": "RECOLETA",
+    "lat": -34.599607,
+    "lon": -58.3969518,
+    "display_name": "2087, Avenida Córdoba, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, C1120AAC, Argentina"
+  },
+  {
+    "address": "Juncal 2607",
+    "neighborhood": "RECOLETA",
+    "lat": -34.5901721,
+    "lon": -58.4033382,
+    "display_name": "2607, Juncal, Barrio Norte, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, C1425BGC, Argentina"
+  },
+  {
+    "address": "Posadas 1173",
+    "neighborhood": "RECOLETA",
+    "lat": -34.5852625,
+    "lon": -58.3902856,
+    "display_name": "Avenida Alvear, La Isla, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, C1113AAX, Argentina"
+  },
+  {
+    "address": "Rodriguez Peña 1075",
+    "neighborhood": "RECOLETA",
+    "lat": -34.597354,
+    "lon": -58.3929668,
+    "display_name": "Rodriguez Peña, Marcelo T. de Alvear, Barrio Norte, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, 1023, Argentina"
+  },
+  {
+    "address": "M. T. de Alvear 815",
+    "neighborhood": "RECOLETA",
+    "lat": -34.5965923,
+    "lon": -58.4002867,
+    "display_name": "Azcuénaga y M.T. de Alvear, Azcuénaga, Barrio Norte, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, C1115AAF, Argentina"
+  },
+  {
+    "address": "Las Heras 2031",
+    "neighborhood": "RECOLETA",
+    "lat": -34.5897661,
+    "lon": -58.3941256,
+    "display_name": "2031, Avenida General Las Heras, La Isla, Recoleta, Buenos Aires, Comuna 2, Ciudad Autónoma de Buenos Aires, 1128, Argentina"
+  },
+  {
+    "address": "Tagle 2504",
+    "neighborhood": "RECOLETA",
+    "lat": -34.5842789,
+    "lon": -58.4005121,
+    "display_name": "2504, Tagle, La Isla, Palermo, Buenos Aires, Comuna 14, Ciudad Autónoma de Buenos Aires, C1425AAR, Argentina"
+  },
+  {
+    "address": "Arias 2899",
+    "neighborhood": "SAAVEDRA",
+    "lat": -34.5437856,
+    "lon": -58.4780412,
+    "display_name": "2899, Arias, Saavedra, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1429AAL, Argentina"
+  },
+  {
+    "address": "San Juan 2858",
+    "neighborhood": "SAN CRISTOBAL",
+    "lat": -34.6242371,
+    "lon": -58.4049587,
+    "display_name": "2858, Avenida San Juan, San Cristóbal, Buenos Aires, Comuna 3, Ciudad Autónoma de Buenos Aires, 1246, Argentina"
+  },
+  {
+    "address": "Av. Caseros 2812",
+    "neighborhood": "PARQUE PATRICIOS",
+    "lat": -34.6366868,
+    "lon": -58.402377,
+    "display_name": "2812, Avenida Caseros, Parque Patricios, Buenos Aires, Distrito Tecnológico, Comuna 4, Ciudad Autónoma de Buenos Aires, C1264AAH, Argentina"
+  },
+  {
+    "address": "La Rioja 1004",
+    "neighborhood": "SAN CRISTOBAL",
+    "lat": -34.6221019,
+    "lon": -58.4072825,
+    "display_name": "1004, La Rioja, San Cristóbal, Buenos Aires, Comuna 3, Ciudad Autónoma de Buenos Aires, 1231, Argentina"
+  },
+  {
+    "address": "Av. Independencia 2447",
+    "neighborhood": "SAN CRISTOBAL",
+    "lat": -34.6184883,
+    "lon": -58.4005294,
+    "display_name": "2447, Avenida Independencia, Balvanera, Buenos Aires, Comuna 3, Ciudad Autónoma de Buenos Aires, C1225AAG, Argentina"
+  },
+  {
+    "address": "Av. Independencia 2676",
+    "neighborhood": "SAN CRISTOBAL",
+    "lat": -34.6190452,
+    "lon": -58.4032406,
+    "display_name": "Farmacity, 2676, Avenida Independencia, San Cristóbal, Buenos Aires, Comuna 3, Ciudad Autónoma de Buenos Aires, C1225AAI, Argentina"
+  },
+  {
+    "address": "Av. Independencia 3829",
+    "neighborhood": "SAN CRISTOBAL",
+    "lat": -34.6203436,
+    "lon": -58.410901,
+    "display_name": "Avenida Independencia, San Cristóbal, Buenos Aires, Comuna 3, Ciudad Autónoma de Buenos Aires, 1225, Argentina"
+  },
+  {
+    "address": "Juan de Garay 3102",
+    "neighborhood": "PARQUE PATRICIOS",
+    "lat": -34.6296794,
+    "lon": -58.4084925,
+    "display_name": "3102, Avenida Juan de Garay, Parque Patricios, Buenos Aires, Comuna 4, Ciudad Autónoma de Buenos Aires, 1242, Argentina"
+  },
+  {
+    "address": "Acoyte 675",
+    "neighborhood": "CABALLITO",
+    "lat": -34.6110534,
+    "lon": -58.4390448,
+    "display_name": "675, Avenida Acoyte, Caballito, Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, 1405, Argentina"
+  },
+  {
+    "address": "Av. Boedo 335",
+    "neighborhood": "BOEDO",
+    "lat": -34.6337223,
+    "lon": -58.4160689,
+    "display_name": "Avenida Boedo, Boedo, Buenos Aires, Comuna 5, Ciudad Autónoma de Buenos Aires, 1240, Argentina"
+  },
+  {
+    "address": "Simon de Iriondo 1117",
+    "neighborhood": "SAN FERNANDO",
+    "lat": -34.4528155,
+    "lon": -58.53953,
+    "display_name": "1117, Simón de Iriondo, Punta Chica, Victoria, Partido de San Fernando, Buenos Aires, 1644, Argentina"
+  },
+  {
+    "address": "25 De Mayo 190",
+    "neighborhood": "SAN ISIDRO",
+    "lat": -34.4700347,
+    "lon": -58.5087266,
+    "display_name": "190, Avenida 25 de Mayo, San Isidro, Partido de San Isidro, Buenos Aires, B1642DMD, Argentina"
+  },
+  {
+    "address": "San Martin 1897",
+    "neighborhood": "SAN MARTIN",
+    "lat": -34.5820887,
+    "lon": -58.5401069,
+    "display_name": "YPF, 1897, Avenida 101 - Doctor Ricardo Balbín, Ciudad del Libertador General San Martín, Partido de General San Martín, Buenos Aires, B1650, Argentina"
+  },
+  {
+    "address": "Sarmiento 1801",
+    "neighborhood": "SAN MARTIN",
+    "lat": -34.576842,
+    "lon": -58.532405,
+    "display_name": "1801, 81 - Sarmiento, Ciudad del Libertador General San Martín, Partido de General San Martín, Buenos Aires, B1650CEG, Argentina"
+  },
+  {
+    "address": "Moreno 3716",
+    "neighborhood": "SAN MARTIN",
+    "lat": -34.5782979,
+    "lon": -58.5359026,
+    "display_name": "3716, 48 - Moreno, Ciudad del Libertador General San Martín, Partido de General San Martín, Buenos Aires, B1650CEM, Argentina"
+  },
+  {
+    "address": "Sarmiento 1023",
+    "neighborhood": "SAN MIGUEL",
+    "lat": -34.5466208,
+    "lon": -58.7079278,
+    "display_name": "Domingo Faustino Sarmiento, San Miguel, Partido de San Miguel, Buenos Aires, B1663, Argentina"
+  },
+  {
+    "address": "Serrano 1324",
+    "neighborhood": "SAN MIGUEL",
+    "lat": -34.5265,
+    "lon": -58.726443,
+    "display_name": "Serrano, Belgrano, San Miguel, Partido de San Miguel, Buenos Aires, B1663, Argentina"
+  },
+  {
+    "address": "Av. Peron 604",
+    "neighborhood": "SAN MIGUEL",
+    "lat": -34.5417024,
+    "lon": -58.7127552,
+    "display_name": "Avenida Presidente Juan Domingo Perón, San Miguel, Partido de San Miguel, Buenos Aires, B1663, Argentina"
+  },
+  {
+    "address": "Rosetti y Saavedra",
+    "neighborhood": "SAN MIGUEL",
+    "lat": -34.5424287,
+    "lon": -58.6941823,
+    "display_name": "Rosetti y Saavedra, Rosetti, Muñiz, Partido de San Miguel, Buenos Aires, B1663, Argentina"
+  },
+  {
+    "address": "Callao 695",
+    "neighborhood": "SAN NICOLAS",
+    "lat": -34.6009433,
+    "lon": -58.3926138,
+    "display_name": "695, Avenida Callao, San Nicolás, Buenos Aires, Comuna 1, Ciudad Autónoma de Buenos Aires, C1022AAG, Argentina"
+  },
+  {
+    "address": "Av. Independencia 412",
+    "neighborhood": "SAN TELMO",
+    "lat": -34.617317,
+    "lon": -58.3719054,
+    "display_name": "412, Avenida Independencia, San Telmo, Buenos Aires, Comuna 1, Ciudad Autónoma de Buenos Aires, C1200AAR, Argentina"
+  },
+  {
+    "address": "Peru 1382",
+    "neighborhood": "SAN TELMO",
+    "lat": -34.6241202,
+    "lon": -58.3739557,
+    "display_name": "1382, Perú, San Telmo, Buenos Aires, Distrito de Las Artes, Comuna 1, Ciudad Autónoma de Buenos Aires, 1141, Argentina"
+  },
+  {
+    "address": "Defensa 1745",
+    "neighborhood": "SAN TELMO",
+    "lat": -34.6285982,
+    "lon": -58.3708817,
+    "display_name": "1745, Defensa, Barracas, Buenos Aires, Distrito de Las Artes, Comuna 4, Ciudad Autónoma de Buenos Aires, C1143AAH, Argentina"
+  },
+  {
+    "address": "Defensa 1649",
+    "neighborhood": "SAN TELMO",
+    "lat": -34.6274056,
+    "lon": -58.3709895,
+    "display_name": "1649, Defensa, Barracas, Buenos Aires, Distrito de Las Artes, Comuna 4, Ciudad Autónoma de Buenos Aires, C1143AAH, Argentina"
+  },
+  {
+    "address": "Rodriguez Peña 2209",
+    "neighborhood": "SANTOS LUGARES",
+    "lat": -34.6024359,
+    "lon": -58.5498698,
+    "display_name": "2209, 425 - Rodríguez Peña, Santos Lugares, Partido de Tres de Febrero, Buenos Aires, B1676BUQ, Argentina"
+  },
+  {
+    "address": "Av. Meeks 1189",
+    "neighborhood": "TEMPERLEY",
+    "lat": -34.7755579,
+    "lon": -58.3974213,
+    "display_name": "Avenida Meeks, Temperley, Partido de Lomas de Zamora, Buenos Aires, B1834, Argentina"
+  },
+  {
+    "address": "Cazon 295",
+    "neighborhood": "TIGRE",
+    "lat": -34.4324537,
+    "lon": -58.5687023,
+    "display_name": "295, Avenida Daniel M. Cazón, Tigre, Partido de Tigre, Buenos Aires, B1648EWC, Argentina"
+  },
+  {
+    "address": "Guareschi 158",
+    "neighborhood": "TIGRE",
+    "lat": -34.4239705,
+    "lon": -58.5741842,
+    "display_name": "158, Pedro Guareschi, Tigre, Partido de Tigre, Buenos Aires, B1648AUH, Argentina"
+  },
+  {
+    "address": "Av. Maipu 262",
+    "neighborhood": "TIGRE",
+    "lat": -34.4145406,
+    "lon": -58.5869401,
+    "display_name": "Maipú, Tigre, Partido de Tigre, Buenos Aires, B1648DAP, Argentina"
+  },
+  {
+    "address": "Italia 1300",
+    "neighborhood": "TIGRE",
+    "lat": -34.4448697,
+    "lon": -58.5772871,
+    "display_name": "Italia, Villa Adalguiza, San Fernando, Partido de San Fernando, Buenos Aires, B1648CIG, Argentina"
+  },
+  {
+    "address": "Albarellos 1298",
+    "neighborhood": "TIGRE",
+    "lat": -34.4257086,
+    "lon": -58.577836,
+    "display_name": "Albarellos, Tigre, Partido de Tigre, Buenos Aires, B1648AJL, Argentina"
+  },
+  {
+    "address": "Av. Roca 715",
+    "neighborhood": "VICENTE LOPEZ",
+    "lat": -34.5081611,
+    "lon": -58.5148062,
+    "display_name": "Avenida Francisco Uzal, Loma de Roca, Olivos, Vicente López, Partido de Vicente López, Buenos Aires, B1605BNA, Argentina"
+  },
+  {
+    "address": "Libertador 1113",
+    "neighborhood": "VICENTE LOPEZ",
+    "lat": -34.5025614,
+    "lon": -58.4819801,
+    "display_name": "Libertador, Avenida del Libertador, Olivos, Vicente López, Partido de Vicente López, Buenos Aires, 1636, Argentina"
+  },
+  {
+    "address": "Libertador 1817",
+    "neighborhood": "VICENTE LOPEZ",
+    "lat": -34.5162426,
+    "lon": -58.4759079,
+    "display_name": "1817, Avenida del Libertador, Vicente López, Partido de Vicente López, Buenos Aires, 1638, Argentina"
+  },
+  {
+    "address": "Lacroze 4850",
+    "neighborhood": "VILLA BALLESTER",
+    "lat": -34.5486615,
+    "lon": -58.5536199,
+    "display_name": "4850, 61 - Lacroze, Villa Ballester Noreste, Partido de General San Martín, Buenos Aires, B1653, Argentina"
+  },
+  {
+    "address": "Apolinario Figueroa 516",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.6056496,
+    "lon": -58.4473906,
+    "display_name": "516, Coronel Apolinario Figueroa, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1416CPE, Argentina"
+  },
+  {
+    "address": "San Martin 1941",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.6051523,
+    "lon": -58.4554262,
+    "display_name": "1941, Avenida San Martín, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1416CRR, Argentina"
+  },
+  {
+    "address": "Honorio Pueyrredon 1308",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.6053432,
+    "lon": -58.4474215,
+    "display_name": "1308, Avenida Doctor Honorio Pueyrredón, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1414CED, Argentina"
+  },
+  {
+    "address": "Estado de Israel 4623",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.5999655,
+    "lon": -58.4305145,
+    "display_name": "4623, Avenida Estado de Israel, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1192, Argentina"
+  },
+  {
+    "address": "Estado de Israel 4741",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.6011184,
+    "lon": -58.4315504,
+    "display_name": "4741, Avenida Estado de Israel, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, 1122, Argentina"
+  },
+  {
+    "address": "Julian Alvarez 374",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.6009075,
+    "lon": -58.4366911,
+    "display_name": "374, Julián Baltasar Álvarez, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1414AJD, Argentina"
+  },
+  {
+    "address": "Acevedo 507",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.597206,
+    "lon": -58.4391289,
+    "display_name": "507, Acevedo, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1414ASL, Argentina"
+  },
+  {
+    "address": "Scalabrini Ortiz 779",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.5966928,
+    "lon": -58.433571,
+    "display_name": "779, Avenida Raúl Scalabrini Ortiz, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1414DNH, Argentina"
+  },
+  {
+    "address": "Juan B. Justo 2409",
+    "neighborhood": "VILLA CRESPO",
+    "lat": -34.603227,
+    "lon": -58.4567857,
+    "display_name": "Avenida Juan Bautista Justo, Villa Crespo, Buenos Aires, Comuna 15, Ciudad Autónoma de Buenos Aires, C1416DJR, Argentina"
+  },
+  {
+    "address": "Pedro Lozano 3683",
+    "neighborhood": "VILLA DEL PARQUE",
+    "lat": -34.6042735,
+    "lon": -58.5003176,
+    "display_name": "3683, Pedro Lozano, Villa del Parque, Buenos Aires, Comuna 11, Ciudad Autónoma de Buenos Aires, C1417AOP, Argentina"
+  },
+  {
+    "address": "Alvarez Jonte 3677",
+    "neighborhood": "VILLA DEL PARQUE",
+    "lat": -34.6132014,
+    "lon": -58.49285,
+    "display_name": "3677, Álvarez Jonte, Villa del Parque, Buenos Aires, Comuna 11, Ciudad Autónoma de Buenos Aires, C1407GON, Argentina"
+  },
+  {
+    "address": "Nazarre 3387",
+    "neighborhood": "VILLA DEL PARQUE",
+    "lat": -34.6033603,
+    "lon": -58.4966999,
+    "display_name": "3387, Nazarre, Villa del Parque, Buenos Aires, Comuna 11, Ciudad Autónoma de Buenos Aires, C1417AOP, Argentina"
+  },
+  {
+    "address": "Beiro 3685",
+    "neighborhood": "VILLA DEVOTO",
+    "lat": -34.6012962,
+    "lon": -58.5046748,
+    "display_name": "3685, Avenida Francisco Beiró, Villa Devoto, Buenos Aires, Comuna 11, Ciudad Autónoma de Buenos Aires, C1419HYW, Argentina"
+  },
+  {
+    "address": "Segurola 329",
+    "neighborhood": "VELEZ SARSFIELD",
+    "lat": -34.6308557,
+    "lon": -58.4861137,
+    "display_name": "329, Segurola, Floresta, Buenos Aires, Comuna 10, Ciudad Autónoma de Buenos Aires, C1407DYH, Argentina"
+  },
+  {
+    "address": "Mosconi 3106",
+    "neighborhood": "VILLA PUEYRREDON",
+    "lat": -34.5880215,
+    "lon": -58.5048823,
+    "display_name": "3106, Avenida General Mosconi, Villa Pueyrredón, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, 1419, Argentina"
+  },
+  {
+    "address": "Artigas 4118",
+    "neighborhood": "VILLA PUEYRREDON",
+    "lat": -34.5877417,
+    "lon": -58.49391,
+    "display_name": "4118, General José Gervasio Artigas, Villa Pueyrredón, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1431EGH, Argentina"
+  },
+  {
+    "address": "Altolaguirre 2209",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5783764,
+    "lon": -58.4895441,
+    "display_name": "2209, Altolaguirre, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1431EGH, Argentina"
+  },
+  {
+    "address": "Av. Triunvirato 4896",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5731369,
+    "lon": -58.4880773,
+    "display_name": "4896, Avenida Triunvirato, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1431DOD, Argentina"
+  },
+  {
+    "address": "Av. Congreso 5002",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.56941,
+    "lon": -58.489206,
+    "display_name": "5002, Avenida Congreso, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1431DUB, Argentina"
+  },
+  {
+    "address": "Monroe 4185",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5686307,
+    "lon": -58.4771067,
+    "display_name": "4185, Monroe, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, 1430, Argentina"
+  },
+  {
+    "address": "Monroe 4526",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5708397,
+    "lon": -58.480219,
+    "display_name": "4526, Monroe, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, 1431, Argentina"
+  },
+  {
+    "address": "Triunvirato 3613",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5714076,
+    "lon": -58.4901311,
+    "display_name": "Triunvirato, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1431DOD, Argentina"
+  },
+  {
+    "address": "Triunvirato 3829",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5714076,
+    "lon": -58.4901311,
+    "display_name": "Triunvirato, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1431DOD, Argentina"
+  },
+  {
+    "address": "Olazabal 4878",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.575431,
+    "lon": -58.4837809,
+    "display_name": "4878, Avenida Olazábal, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, 1431, Argentina"
+  },
+  {
+    "address": "Valdenegro 3002",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.567313,
+    "lon": -58.485851,
+    "display_name": "3002, Valdenegro, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1431, Argentina"
+  },
+  {
+    "address": "Echeverria 4264",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5736431,
+    "lon": -58.4737962,
+    "display_name": "Kioskiri, 4264, Echeverría, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, 1430, Argentina"
+  },
+  {
+    "address": "Echeverria 4102",
+    "neighborhood": "VILLA URQUIZA",
+    "lat": -34.5727861,
+    "lon": -58.4723931,
+    "display_name": "4102, Echeverría, Villa Urquiza, Buenos Aires, Comuna 12, Ciudad Autónoma de Buenos Aires, C1426ABC, Argentina"
+  },
+  {
+    "address": "Av. Anta 55",
+    "neighborhood": "ZARATE",
+    "lat": -34.1001181,
+    "lon": -59.0345599,
+    "display_name": "55, Avenida Anta, Zárate, Partido de Zárate, Buenos Aires, 2800, Argentina"
+  }
+];
+
+        // Initialize map immediately
+        initializeMap(locations);
+
+        function initializeMap(locations) {
+
+        // Initialize the map centered on Buenos Aires
+        const map = L.map('map').setView([-34.6037, -58.3816], 11);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Generate colors for neighborhoods
+        const neighborhoods = [...new Set(locations.map(l => l.neighborhood))].sort();
+        const colors = {};
+        neighborhoods.forEach((n, i) => {
+            const hue = (i * 360 / neighborhoods.length) % 360;
+            colors[n] = `hsl(${hue}, 70%, 50%)`;
+        });
+
+        // Update stats
+        document.getElementById('total-locations').textContent = locations.length;
+        document.getElementById('total-neighborhoods').textContent = neighborhoods.length;
+
+        // Group markers by neighborhood for layer control
+        const markerLayers = {};
+        const allMarkers = [];
+
+        // Add markers to the map
+        locations.forEach(location => {
+            const color = colors[location.neighborhood];
+
+            // Create custom icon
+            const customIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="
+                    background-color: ${color};
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    border: 2px solid white;
+                    box-shadow: 0 0 4px rgba(0,0,0,0.4);
+                "></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+
+            // Create marker
+            const marker = L.marker([location.lat, location.lon], {
+                icon: customIcon,
+                title: location.address
+            });
+
+            // Create popup content
+            const popupContent = `
+                <div class="popup-content">
+                    <h4>${location.neighborhood}</h4>
+                    <p class="address">${location.address}</p>
+                    <p style="font-size: 10px; color: #666; margin-top: 8px;">
+                        ${location.lat.toFixed(6)}, ${location.lon.toFixed(6)}
+                    </p>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent);
+            marker.addTo(map);
+            allMarkers.push(marker);
+
+            // Add to neighborhood layer
+            if (!markerLayers[location.neighborhood]) {
+                markerLayers[location.neighborhood] = [];
+            }
+            markerLayers[location.neighborhood].push(marker);
+        });
+
+        // Create legend
+        const legend = document.getElementById('legend');
+        neighborhoods.forEach(neighborhood => {
+            const count = markerLayers[neighborhood] ? markerLayers[neighborhood].length : 0;
+
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            item.style.cursor = 'pointer';
+
+            const colorBox = document.createElement('div');
+            colorBox.className = 'legend-color';
+            colorBox.style.backgroundColor = colors[neighborhood];
+
+            const text = document.createElement('span');
+            text.textContent = `${neighborhood} (${count})`;
+
+            item.appendChild(colorBox);
+            item.appendChild(text);
+
+            // Click to zoom to neighborhood
+            item.addEventListener('click', () => {
+                if (markerLayers[neighborhood] && markerLayers[neighborhood].length > 0) {
+                    const group = L.featureGroup(markerLayers[neighborhood]);
+                    map.fitBounds(group.getBounds(), { padding: [50, 50] });
+                }
+            });
+
+            legend.appendChild(item);
+        });
+
+        // Fit all markers function
+        function fitAllMarkers() {
+            if (allMarkers.length > 0) {
+                const group = L.featureGroup(allMarkers);
+                map.fitBounds(group.getBounds(), { padding: [50, 50] });
+            }
+        }
+
+        // Toggle clusters (simple implementation - just changes zoom)
+        function toggleClusters() {
+            const currentZoom = map.getZoom();
+            if (currentZoom > 12) {
+                map.setZoom(11);
+            } else {
+                map.setZoom(14);
+            }
+        }
+
+        // Fit all markers on initial load
+        fitAllMarkers();
+
+        // Make functions available globally for button onclick
+        window.fitAllMarkers = fitAllMarkers;
+        window.toggleClusters = toggleClusters;
+        }
+    </script>
+</body>
+</html>
